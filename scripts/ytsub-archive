@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1. Dependency check
+if ! command -v yt-dlp &>/dev/null; then
+    echo "Error: yt-dlp is not installed. Run: sudo dnf install yt-dlp" >&2
+    exit 1
+fi
+
+# 2. Defaults
+OUT_DIR="./downloads"
+LANG="en"
+LIMIT=""
+DATE_AFTER=""
+ARCHIVE_FILE=""
+URL=""
+
+# 3. Help / Usage
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTIONS] <URL>
+
+Downloads clean transcripts (.txt), descriptions, and info.json
+into an organized folder structure for channels, playlists, or videos.
+
+Arguments:
+  URL                     Video, Playlist, or Channel URL (required)
+
+Options:
+  -o, --output DIR        Base output directory (default: ./downloads)
+  -l, --lang LANG         Subtitle language code (default: en)
+  -n, --limit NUM         Max number of videos to process (e.g. 5, 20)
+  --date-after YYYYMMDD   Only process videos uploaded on or after this date
+  -a, --archive FILE      Archive file (default: <OUT_DIR>/archive.txt)
+  -h, --help              Show this help message
+
+Examples:
+  $(basename "$0") -l tr "https://www.youtube.com/channel/UCtcbW4FISitBM4uZOH5lqFg"
+  $(basename "$0") -l en -n 10 "https://www.youtube.com/@Veritasium"
+EOF
+    exit 0
+}
+
+# 4. Parse Arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o|--output)
+            OUT_DIR="$2"
+            shift 2
+            ;;
+        -l|--lang)
+            LANG="$2"
+            shift 2
+            ;;
+        -n|--limit)
+            LIMIT="$2"
+            shift 2
+            ;;
+        --date-after)
+            DATE_AFTER="$2"
+            shift 2
+            ;;
+        -a|--archive)
+            ARCHIVE_FILE="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            ;;
+        -*)
+            echo "Error: Unknown option '$1'" >&2
+            usage
+            ;;
+        *)
+            if [[ -z "$URL" ]]; then
+                URL="$1"
+                shift
+            else
+                echo "Error: Multiple URLs provided." >&2
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+if [[ -z "$URL" ]]; then
+    echo "Error: Missing URL." >&2
+    usage
+fi
+
+# If a base channel URL is passed without a specific tab, append /videos
+if [[ "$URL" =~ ^https?://(www\.)?youtube\.com/(channel/[^/]+|@[^/]+|c/[^/]+)/?$ ]]; then
+    URL="${URL%/}/videos"
+fi
+
+# Set default archive file if not specified
+if [[ -z "$ARCHIVE_FILE" ]]; then
+    ARCHIVE_FILE="${OUT_DIR}/archive.txt"
+fi
+
+mkdir -p "$OUT_DIR"
+
+# 5. Build yt-dlp arguments
+YTDL_ARGS=(
+    # Do not download video/audio
+    "--skip-download"
+
+    # Metadata & Descriptions (suppress playlist-level metadata dumps)
+    "--write-description"
+    "--write-info-json"
+    "--no-write-playlist-metafiles"
+
+    # Subtitles
+    "--write-sub"
+    "--write-auto-sub"
+    "--sub-lang" "$LANG"
+    "--convert-subs" "srt"
+
+    # Archive & Error Handling
+    "--ignore-errors"
+    "--no-abort-on-error"
+    "--download-archive" "$ARCHIVE_FILE"
+    "--force-write-archive"
+
+    # Folder hierarchy
+    "-o" "${OUT_DIR}/%(channel,uploader|Unknown_Channel)s/%(upload_date>%Y-%m-%d,0000-00-00)s - %(title)s [%(id)s]/%(title)s.%(ext)s"
+
+    # Subtitle cleaner: handles CRLF, HTML unescaping, tags, and rolling caption deduplication
+    "--exec" 'before_dl:python3 -c '\''
+import sys, os, re, html
+
+for filepath in sys.argv[1:]:
+    if not filepath or not os.path.isfile(filepath):
+        continue
+    try:
+        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    except Exception:
+        continue
+
+    # Normalize CRLF line endings
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+
+    lines = []
+    for line in content.split("\n"):
+        line = line.strip()
+        if not line or line.isdigit() or "-->" in line:
+            continue
+        line = re.sub(r"<[^>]+>", "", line).strip()
+        line = html.unescape(line)
+        if not line:
+            continue
+
+        # Skip exact duplicate lines
+        if lines and lines[-1] == line:
+            continue
+        # Merge rolling auto-caption segments
+        if lines and line.startswith(lines[-1]):
+            lines[-1] = line
+            continue
+
+        lines.append(line)
+
+    out_path = re.sub(r"\.(srt|vtt)$", ".txt", filepath)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    try:
+        os.remove(filepath)
+    except Exception:
+        pass
+'\'' %(requested_subtitles.:.filepath)#q'
+)
+
+if [[ -n "$LIMIT" ]]; then
+    YTDL_ARGS+=("--max-downloads" "$LIMIT")
+fi
+
+if [[ -n "$DATE_AFTER" ]]; then
+    YTDL_ARGS+=("--dateafter" "$DATE_AFTER")
+fi
+
+echo "=========================================================="
+echo "==> Target URL : $URL"
+echo "==> Output Dir : $OUT_DIR"
+echo "==> Language   : $LANG"
+echo "==> Archive    : $ARCHIVE_FILE"
+echo "=========================================================="
+
+# Run yt-dlp
+yt-dlp "${YTDL_ARGS[@]}" "$URL"
+
+echo ""
+echo "==> Archiving complete. Saved to: $OUT_DIR"

@@ -1,0 +1,41 @@
+<task_description>
+Reverse-engineer a clean, publication-ready spoken script from raw, auto-generated video captions, using the video title and description for thematic grounding while strictly flagging speech recognition errors, uncertain terms, and ungrounded entities as [UNVERIFIED].
+</task_description>
+
+<context>
+The model will process raw input variables provided at runtime:
+- Title: 
+- Raw Auto-Generated Subtitles: added as a separate file.
+
+<description>
+
+</description>
+
+</context>
+
+<instructions>
+1. Input Parsing & Alignment:
+   - Ingest video title, description, and auto generated captions.
+   - Map out the narrative flow, logical topic shifts, and implicit speaker turns from the subtitle stream.
+
+2. Mandatory Web-Search & Grounding Protocol:
+   - Trigger targeted web searches whenever a proper noun, technical term, library/API name, tool, brand, dynamic/time-sensitive fact, or garbled phonetic transcription appears in the captions.
+   - Prioritize real-time web retrieval over parametric memory to resolve butchered automated speech recognition (ASR) tokens (e.g., phonetic transcriptions of technical jargon or entity names).
+   - If search definitively corroborates the entity within the context of the title and description, insert the corrected term.
+   - If search results are ambiguous, conflicting, or return no verification, DO NOT guess. Tag the term or phrase using the strict format: `[UNVERIFIED: <raw_or_best_guess_term>]`.
+
+3. Script Reconstruction & Structural Formatting:
+   - Restore natural punctuation, capitalization, sentence boundaries, and cohesive paragraph breaks.
+   - Strip unintentional speech disfluencies (e.g., "uh", "um", stuttered repeated tokens), but retain intentional rhetorical repetition or emphasis.
+   - Organize the transcript into logical thematic sections using Markdown headers (e.g., `### Introduction`, `### Core Concept`, `### Summary`).
+   - If distinct speakers are discernible from context or linguistic cues, prefix dialogue with speaker markers (e.g., `Speaker 1:`, `Speaker 2:` or explicit names if verified via search/context). Otherwise, maintain standard narrative paragraph blocks.
+
+4. Negative Constraints:
+   - DO NOT fabricate details, commentary, explanations, or conclusions that do not exist in {{AUTO_GENERATED_CAPTIONS}}.
+   - DO NOT resolve ambiguous phonetic misinterpretations with ungrounded confidence; always apply `[UNVERIFIED]`.
+   - DO NOT output conversational filler, introductory remarks (e.g., "Here is your script:"), or post-generation summaries.
+</instructions>
+
+<output_format>
+Output the reconstructed script directly using standard Markdown. Use `### [Section Title]` for structural breaks, inline code backticks for commands/code if applicable, and `[UNVERIFIED: <term>]` for any unverified speech recognition artifacts. Deliver zero conversational preamble or postscript.
+</output_format>
