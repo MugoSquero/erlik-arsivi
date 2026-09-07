@@ -1,3 +1,4 @@
+
 # Erlik Belgesel & Video Transkript Arşivi
 
 Bu depoda, [@ERLİK61](https://www.youtube.com/@ERLİK61) YouTube kanalında yayınlanan belgesel ve inceleme videolarının metin tabanlı, yapılandırılmış ve aranabilir transkript arşivini bulabilirsiniz.
@@ -25,6 +26,12 @@ Dosya başındaki `status` değerleri şu anlama gelir:
 - `seriler/`: Çok bölümlü çalışmalar (*Şeytan Üçgeni*, *Taht Oyunları* vb.)
 - `tekil-videolar/`: Bağımsız belgeseller ve inceleme videoları
 - `scripts/`: Altyazı çekme ve temizleme otomasyonları
+
+---
+
+### 🔗 İlgili Bağlantılar ve Harici Kaynaklar
+
+* Resmi Erlik hesapları, topluluk projeleri, yedek arşivler ve harici kaynaklar için [`docs/resources.md`](docs/resources.md) dosyasına bakabilirsiniz.
 
 ---
 
