@@ -6,7 +6,7 @@ youtube_url: "https://erlik.watch/watch/almanlar-kabul-edince-biz-de-kabul-ettik
 duration: "00:15:05"
 published_date: "2021-06-13"
 status: "verified"
-verified_by: @MugoSquero
+verified_by: "@MugoSquero"
 tags: []
 ---
 
